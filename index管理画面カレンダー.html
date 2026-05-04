@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>in'dex hair 管理システム</title>
+    <style>
+        :root {
+            --primary-color: #333;
+            --bg-color: #f4f4f4;
+            --low-color: #3498db;    /* ◯：青系 */
+            --medium-color: #f1c40f; /* ▲：黄色系 */
+            --high-color: #e74c3c;   /* ❌：赤系 */
+            --today-bg: #fff5f5;     /* 当日の薄赤い背景色 */
+            --today-border: #ff8787;  /* 当日の枠線強調 */
+            --accent-color: #2c3e50; /* ナビ用濃紺 */
+            --past-text: #ccc;       /* 過去の日付の文字色 */
+            --past-bg: #f9f9f9;      /* 過去の日付の背景色 */
+        }
+
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            overflow-x: hidden;
+        }
+
+        /* --- ヘッダー・ナビゲーション --- */
+        header {
+            width: 100%;
+            background: white;
+            padding: 15px 0 0 0;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .header-top {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px 15px 20px;
+        }
+
+        h1 { margin: 0; font-size: 1.5rem; color: var(--primary-color); }
+
+        #live-clock {
+            font-size: 1rem;
+            font-weight: bold;
+            color: #666;
+            background: #f9f9f9;
+            padding: 5px 15px;
+            border-radius: 20px;
+            border: 1px solid #ddd;
+        }
+
+        .nav-menu {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            padding: 12px;
+            background: #fdfdfd;
+            border-top: 1px solid #eee;
+        }
+
+        .nav-item {
+            padding: 8px 18px;
+            background: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            color: #555;
+        }
+
+        .nav-item.active {
+            background: var(--accent-color);
+            color: white;
+            border-color: var(--accent-color);
+        }
+
+        .nav-item.disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .nav-item:hover:not(.disabled) {
+            background: #e9ecef;
+            transform: translateY(-1px);
+        }
+
+        /* --- コンテンツエリア --- */
+        #calendar-view, #timeline-view {
+            width: 95%;
+            max-width: 1200px;
+            margin: 20px auto;
+        }
+
+        /* --- カレンダー詳細 --- */
+        #calendar-view {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
+        .calendar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .calendar-header button {
+            padding: 8px 15px;
+            cursor: pointer;
+            border: 1px solid #ddd;
+            background: white;
+            border-radius: 4px;
+        }
+
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 8px;
+        }
+
+        .day-label {
+            text-align: center;
+            font-weight: bold;
+            padding: 10px;
+            color: #999;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+        }
+
+        .day-cell {
+            min-height: 120px;
+            border: 1px solid #f0f0f0;
+            padding: 10px;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            background: #fff;
+            transition: 0.3s;
+            border-radius: 4px;
+        }
+
+        .day-cell.is-past {
+            background-color: var(--past-bg);
+            color: var(--past-text);
+            opacity: 0.7;
+        }
+        .day-cell.is-past .day-num { color: var(--past-text); }
+        .day-cell.is-past .status-icon { filter: grayscale(1); opacity: 0.5; }
+
+        .day-cell.is-today {
+            background-color: var(--today-bg);
+            border: 2px solid var(--today-border);
+        }
+
+        .day-cell:hover {
+            background-color: #f0f7ff;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            z-index: 10;
+        }
+
+        .day-num { font-weight: bold; font-size: 1.1rem; color: #444; }
+
+        .status-info {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            flex-grow: 1;
+        }
+
+        .status-icon { font-size: 2rem; font-weight: bold; line-height: 1; }
+
+        .count-badge { font-size: 0.75rem; color: #888; margin-top: 5px; }
+
+        /* --- 凡例エリア --- */
+        .calendar-legend {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            margin-top: 35px;
+            padding: 25px;
+            background: #fafafa;
+            border-radius: 12px;
+            border: 1px solid #eee;
+        }
+
+        .legend-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            flex: 1;
+        }
+
+        .legend-icon { font-size: 3rem; line-height: 1; font-weight: bold; }
+        .legend-label { font-size: 1.1rem; font-weight: bold; color: #333; }
+        .legend-desc { font-size: 0.85rem; color: #888; }
+
+        /* --- タイムライン --- */
+        #timeline-view {
+            display: none;
+            background: white;
+            padding: 10px;
+            border-radius: 12px;
+            height: 85vh;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        #timeline-frame {
+            width: 100%;
+            height: 100%;
+            border: none;
+            border-radius: 8px;
+        }
+
+        /* レスポンシブ */
+        @media (max-width: 768px) {
+            .header-top { flex-direction: column; gap: 10px; }
+            .nav-menu { flex-wrap: wrap; gap: 8px; }
+            .nav-item { padding: 6px 10px; font-size: 0.8rem; }
+            .calendar-legend { flex-direction: column; gap: 20px; }
+            .day-cell { min-height: 90px; padding: 5px; }
+            .status-icon { font-size: 1.5rem; }
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="header-top">
+        <h1>in'dex hair 管理システム</h1>
+        <div id="live-clock">読み込み中...</div>
+    </div>
+    
+    <nav class="nav-menu">
+        <div class="nav-item active" id="btn-calendar" onclick="switchView('calendar')">📅 カレンダー</div>
+        <div class="nav-item" id="btn-timeline" onclick="switchView('timeline')">⏳ タイムライン</div>
+        <div class="nav-item disabled">🖼️ ギャラリー編集</div>
+        <div class="nav-item disabled">💰 売上管理</div>
+        <div class="nav-item disabled">📦 在庫管理</div>
+    </nav>
+</header>
+
+<!-- カレンダー画面 -->
+<section id="calendar-view">
+    <div class="calendar-header">
+        <button onclick="changeMonth(-1)">◀ 前月</button>
+        <h2 id="monthDisplay"></h2>
+        <button onclick="changeMonth(1)">次月 ▶</button>
+    </div>
+
+    <div class="calendar-grid" id="calendarGrid"></div>
+
+    <div class="calendar-legend">
+        <div class="legend-item">
+            <span class="legend-icon" style="color: var(--low-color);">◯</span>
+            <span class="legend-label">空きあり</span>
+            <span class="legend-desc">予約率 50％未満</span>
+        </div>
+        <div class="legend-item">
+            <span class="legend-icon" style="color: var(--medium-color);">▲</span>
+            <span class="legend-label">残りわずか</span>
+            <span class="legend-desc">予約率 50％〜90％</span>
+        </div>
+        <div class="legend-item">
+            <span class="legend-icon" style="color: var(--high-color);">❌</span>
+            <span class="legend-label">満員御礼</span>
+            <span class="legend-desc">予約率 90％以上</span>
+        </div>
+    </div>
+</section>
+
+<!-- タイムライン画面 -->
+<section id="timeline-view">
+    <iframe id="timeline-frame" src=""></iframe>
+</section>
+
+<script>
+    let currentViewDate = new Date();
+    const today = new Date();
+    const todayStripped = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+    const capacity = 15;
+    let randomMockData = {};
+
+    function init() {
+        generateRandomData(); 
+        renderCalendar();
+        updateClock();
+        setInterval(updateClock, 1000);
+    }
+
+    function updateClock() {
+        const now = new Date();
+        const days = ['日', '月', '火', '水', '木', '金', '土'];
+        const y = now.getFullYear();
+        const m = now.getMonth() + 1;
+        const d = now.getDate();
+        const day = days[now.getDay()];
+        const time = now.toLocaleTimeString('ja-JP', { hour12: false });
+        document.getElementById('live-clock').innerText = `${y}/${m}/${d}(${day}) ${time}`;
+    }
+
+    function switchView(viewName, dateStr = null) {
+        document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+        
+        if (viewName === 'calendar') {
+            document.getElementById('btn-calendar').classList.add('active');
+            document.getElementById('calendar-view').style.display = 'block';
+            document.getElementById('timeline-view').style.display = 'none';
+        } else if (viewName === 'timeline') {
+            document.getElementById('btn-timeline').classList.add('active');
+            document.getElementById('calendar-view').style.display = 'none';
+            document.getElementById('timeline-view').style.display = 'block';
+            
+            const frame = document.getElementById('timeline-frame');
+            
+            // dateStrがない場合は今日の日付をデフォルトにする
+            const targetDate = dateStr || `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+            
+            // 重要：新しい日付をパラメータにセットしたURL
+            const targetUrl = `https://yuhei-bot.github.io/timeline/?date=${targetDate}`;
+            
+            // URLが違う場合のみ、あるいは強制的にiframeを更新する
+            frame.src = targetUrl;
+        }
+    }
+
+    function generateRandomData() {
+        const year = currentViewDate.getFullYear();
+        const month = currentViewDate.getMonth();
+        const lastDate = new Date(year, month + 1, 0).getDate();
+        randomMockData = {};
+
+        for (let date = 1; date <= lastDate; date++) {
+            const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(date).padStart(2, '0')}`;
+            const rand = Math.random();
+            let count;
+            if (rand > 0.85) count = Math.floor(Math.random() * 2) + 14; 
+            else if (rand > 0.45) count = Math.floor(Math.random() * 6) + 8; 
+            else count = Math.floor(Math.random() * 8); 
+            randomMockData[dateStr] = count;
+        }
+    }
+
+    function renderCalendar() {
+        const grid = document.getElementById('calendarGrid');
+        const monthDisplay = document.getElementById('monthDisplay');
+        grid.innerHTML = '';
+
+        const year = currentViewDate.getFullYear();
+        const month = currentViewDate.getMonth();
+        monthDisplay.innerText = `${year}年 ${month + 1}月`;
+
+        ['日', '月', '火', '水', '木', '金', '土'].forEach(day => {
+            const div = document.createElement('div');
+            div.className = 'day-label';
+            div.innerText = day;
+            grid.appendChild(div);
+        });
+
+        const firstDay = new Date(year, month, 1).getDay();
+        const lastDate = new Date(year, month + 1, 0).getDate();
+
+        for (let i = 0; i < firstDay; i++) grid.appendChild(document.createElement('div'));
+
+        for (let date = 1; date <= lastDate; date++) {
+            const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(date).padStart(2, '0')}`;
+            const targetDateObj = new Date(year, month, date);
+            
+            const count = randomMockData[dateStr] || 0;
+            const rate = (count / capacity) * 100;
+
+            const cell = document.createElement('div');
+            cell.className = 'day-cell';
+
+            if (targetDateObj < todayStripped) {
+                cell.classList.add('is-past');
+            } else if (targetDateObj.getTime() === todayStripped.getTime()) {
+                cell.classList.add('is-today');
+            }
+
+            let icon = '◯'; let color = 'var(--low-color)';
+            if (rate >= 90) { icon = '❌'; color = 'var(--high-color)'; }
+            else if (rate >= 50) { icon = '▲'; color = 'var(--medium-color)'; }
+
+            cell.innerHTML = `
+                <div class="day-num">${date}</div>
+                <div class="status-info">
+                    <div class="status-icon" style="color: ${color}">${icon}</div>
+                    <div class="count-badge">${count} 件 / ${capacity}</div>
+                </div>`;
+            
+            cell.onclick = () => switchView('timeline', dateStr);
+            grid.appendChild(cell);
+        }
+    }
+
+    function changeMonth(offset) {
+        currentViewDate.setMonth(currentViewDate.getMonth() + offset);
+        generateRandomData();
+        renderCalendar();
+    }
+
+    init();
+</script>
+
+</body>
+</html>
